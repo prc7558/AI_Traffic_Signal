@@ -1,0 +1,19 @@
+# Required Python packages for Traffic Signal AI Project
+
+# Computer Vision and AI
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+
+# Arduino Communication
+pyserial>=3.5
+
+# Web Dashboard
+flask>=2.3.0
+
+# Data Processing
+pandas>=2.0.0
+
+# Optional: For better performance
+torch>=2.0.0
+torchvision>=0.15.0
