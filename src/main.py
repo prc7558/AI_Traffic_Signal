@@ -160,7 +160,7 @@ class TrafficManagementSystem:
 if __name__ == "__main__":
     # Configuration
     VIDEO_PATH = "../videos/traffic_video.mp4"
-    ARDUINO_PORT = "COM3"  # Change to your Arduino port
+    ARDUINO_PORT = "COM7"  # Change to your Arduino port
     
     try:
         system = TrafficManagementSystem(VIDEO_PATH, ARDUINO_PORT)
