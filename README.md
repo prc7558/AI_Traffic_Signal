@@ -184,6 +184,9 @@ This project is designed to be beginner-friendly:
 
 Feel free to modify and improve this project!
 
+## 📄 License
+
+MIT License - Free to use for learning and projects
 
 ## 👨‍💻 Author
 

@@ -50,7 +50,7 @@ if __name__ == "__main__":
     # On Windows: COM3, COM4, etc.
     # On Linux/Mac: /dev/ttyUSB0, /dev/ttyACM0, etc.
     
-    controller = ArduinoController(port='COM7')
+    controller = ArduinoController(port='COM3')
     
     if controller.arduino:
         print("\nTesting LED signals...")

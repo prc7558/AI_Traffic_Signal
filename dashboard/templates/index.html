@@ -1,192 +1,517 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang=\"en\">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Traffic Management Dashboard</title>
+    <meta charset=\"UTF-8\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+    <title>Dynamic Traffic Dashboard</title>
+    <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">
+    <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>
+    <link href=\"https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap\" rel=\"stylesheet\">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --bg-color: #0f0c29;
+            --panel-color: rgba(255, 255, 255, 0.1);
+            --border-color: rgba(255, 255, 255, 0.2);
+            --light-red: #ef4444;
+            --light-yellow: #f59e0b;
+            --light-green: #10b981;
+            --light-blue: #3b82f6;
+            --glow-red: 0 0 15px #ef4444;
+            --glow-yellow: 0 0 15px #f59e0b;
+            --glow-green: 0 0 15px #10b981;
+            --glow-blue: 0 0 15px #3b82f6;
         }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #610603 0%, #004da4 100%);
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, var(--bg-color) 0%, #302b63 50%, #24243e 100%);
             color: white;
             padding: 20px;
+            min-height: 100vh;
         }
         
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
+        .container { max-width: 1600px; margin: 0 auto; }
         
         h1 {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 15px;
             font-size: 2.5em;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            font-weight: 700;
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.4), 0 0 5px rgba(255, 255, 255, 0.7);
         }
-        
-        .dashboard {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
+
+        .sync-banner {
+            text-align: center;
             margin-bottom: 20px;
+            padding: 10px;
+            background: var(--panel-color);
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(12px);
         }
+
+        .sync-status { display: inline-flex; align-items: center; gap: 8px; font-size: 0.9em; }
+        .sync-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--light-red); animation: pulse 2s infinite; }
+        .sync-dot.active { background: var(--light-green); }
+        
+        .dashboard { display: grid; grid-template-columns: 1.5fr 1fr; gap: 25px; margin-bottom: 20px; }
         
         .video-panel {
-            background: white;
+            background: var(--panel-color);
+            backdrop-filter: blur(12px);
             border-radius: 15px;
-            padding: 20px;
+            padding: 25px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border: 1px solid var(--border-color);
+            position: relative;
         }
+
+        .live-badge {
+            position: absolute; top: 15px; left: 15px;
+            background: var(--light-red); color: white;
+            padding: 4px 10px 4px 8px; border-radius: 6px;
+            font-size: 0.8em; font-weight: 600;
+            display: flex; align-items: center; gap: 6px;
+            box-shadow: 0 0 10px var(--light-red); z-index: 10;
+        }
+
+        .live-badge::before {
+            content: ''; width: 8px; height: 8px;
+            background: white; border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        .no-vehicles-badge {
+            position: absolute; top: 55px; left: 15px;
+            background: var(--light-yellow); color: #000;
+            padding: 4px 10px; border-radius: 6px;
+            font-size: 0.75em; font-weight: 600;
+            box-shadow: 0 0 10px var(--light-yellow);
+            z-index: 10; display: none;
+        }
+
+        .no-vehicles-badge.active { display: block; }
+
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         
-        .video-panel h2 {
-            color: #333;
-            margin-bottom: 15px;
-        }
+        .video-panel h2 { color: #ffffff; margin-bottom: 15px; font-weight: 600; padding-left: 70px; }
+        #video-stream { width: 100%; height: auto; border-radius: 10px; background-color: #333; }
         
-        #video-stream {
-            width: 100%;
-            border-radius: 10px;
-        }
-        
-        .stats-panel {
-            display: grid;
-            grid-template-rows: repeat(4, 1fr);
-            gap: 15px;
-        }
+        .stats-panel { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 20px; }
         
         .stat-card {
-            background: white;
+            background: var(--panel-color);
+            backdrop-filter: blur(12px);
             border-radius: 15px;
             padding: 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border: 1px solid var(--border-color);
+            transition: transform 0.3s;
+            display: flex; flex-direction: column; justify-content: space-between;
+        }
+        
+        .stat-card:hover { transform: translateY(-5px); }
+        .stat-card h3 {
+            color: #dddddd; font-size: 0.9em; margin-bottom: 10px;
+            text-transform: uppercase; font-weight: 400;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .stat-card h3 svg { width: 18px; height: 18px; opacity: 0.8; }
+        .stat-value { font-size: 2.2em; font-weight: 600; color: #ffffff; }
+        
+        .density-LOW { color: var(--light-green) !important; text-shadow: var(--glow-green); }
+        .density-MEDIUM { color: var(--light-yellow) !important; text-shadow: var(--glow-yellow); }
+        .density-HIGH { color: var(--light-red) !important; text-shadow: var(--glow-red); }
+
+        .sparkline { width: 100%; height: 50px; margin-top: 10px; }
+        .sparkline path { stroke-width: 2; }
+        .sparkline-count path { stroke: #818cf8; fill: none; }
+        .sparkline-density path { stroke: #f59e0b; fill: url(#densityGradient); }
+        
+        .traffic-light-container { display: flex; justify-content: center; align-items: center; flex-grow: 1; }
+        .traffic-light-housing {
+            background: #222; display: flex; flex-direction: column;
+            gap: 8px; padding: 10px; border-radius: 10px;
+            width: 60px; border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .light { width: 40px; height: 40px; border-radius: 50%; background: #444; opacity: 0.3; transition: all 0.3s ease; }
+        .light.active.red { background-color: var(--light-red); opacity: 1; box-shadow: var(--glow-red); }
+        .light.active.yellow { background-color: var(--light-yellow); opacity: 1; box-shadow: var(--glow-yellow); }
+        .light.active.green { background-color: var(--light-green); opacity: 1; box-shadow: var(--glow-green); }
+
+        .timer-gauge-container { display: flex; justify-content: center; align-items: center; flex-grow: 1; position: relative; }
+        .timer-gauge-svg { width: 120px; height: 120px; transform: rotate(-90deg); }
+        .gauge-bg { fill: none; stroke: #444; stroke-width: 8; }
+        .gauge-progress { fill: none; stroke: var(--light-green); stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 0.3s ease, stroke 0.3s ease; }
+        .timer-text { position: absolute; font-size: 1.8em; font-weight: 600; }
+        .timer-text span { font-size: 0.5em; font-weight: 400; margin-left: 2px; opacity: 0.8; }
+
+        .info-panel { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-bottom: 20px; }
+        .info-card {
+            background: var(--panel-color);
+            backdrop-filter: blur(12px);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            border: 1px solid var(--border-color);
+            text-align: center;
             transition: transform 0.3s;
         }
+        .info-card:hover { transform: translateY(-3px); }
+        .info-card-title { font-size: 0.75em; text-transform: uppercase; color: #aaa; margin-bottom: 8px; letter-spacing: 1px; }
+        .info-card-value { font-size: 1.5em; font-weight: 600; color: white; }
+        .info-card-icon { font-size: 2em; margin-bottom: 8px; opacity: 0.8; }
+
+        .efficiency-bar { width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+        .efficiency-fill { height: 100%; background: linear-gradient(90deg, var(--light-green), var(--light-blue)); transition: width 0.5s ease; }
+
+        .status-indicator { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; animation: pulse 2s infinite; }
+        .status-active { background-color: var(--light-green); }
+        .status-waiting { background-color: var(--light-yellow); }
+        .status-stopped { background-color: var(--light-red); }
         
-        .stat-card:hover {
-            transform: translateY(-5px);
+        .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border-color); opacity: 0.8; font-size: 0.9em; }
+        .footer button {
+            background: var(--light-blue); border: none; color: white;
+            padding: 8px 16px; border-radius: 6px; cursor: pointer;
+            margin-left: 10px; font-family: inherit; transition: all 0.3s;
         }
-        
-        .stat-card h3 {
-            color: #666;
-            font-size: 0.9em;
-            margin-bottom: 10px;
-            text-transform: uppercase;
+        .footer button:hover { box-shadow: var(--glow-blue); transform: translateY(-2px); }
+
+        .phase-progress { width: 100%; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 10px; overflow: hidden; }
+        .phase-progress-bar { height: 100%; background: linear-gradient(90deg, var(--light-green), var(--light-yellow)); transition: width 1s linear; }
+
+        .timing-info { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 10px; }
+        .timing-item { text-align: center; padding: 10px; border-radius: 8px; }
+        .timing-item.red-time { background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); }
+        .timing-item.green-time { background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); }
+        .timing-item.yellow-time { background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.4); }
+        .timing-label { font-size: 0.75em; text-transform: uppercase; opacity: 0.8; margin-bottom: 5px; }
+        .timing-value { font-size: 1.5em; font-weight: 600; }
+
+        @media (max-width: 1024px) {
+            .dashboard { grid-template-columns: 1fr; }
+            .info-panel { grid-template-columns: repeat(2, 1fr); }
+            .video-panel h2 { padding-left: 0; text-align: center; }
         }
-        
-        .stat-value {
-            font-size: 2.5em;
-            font-weight: bold;
-            color: #333;
-        }
-        
-        .density-LOW { color: #10b981 !important; }
-        .density-MEDIUM { color: #f59e0b !important; }
-        .density-HIGH { color: #ef4444 !important; }
-        
-        .signal-indicator {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            margin-top: 10px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.2);
-        }
-        
-        .signal-RED { background-color: #ef4444; }
-        .signal-YELLOW { background-color: #f59e0b; }
-        .signal-GREEN { background-color: #10b981; }
-        
-        .footer {
-            text-align: center;
-            margin-top: 20px;
-            opacity: 0.8;
+        @media (max-width: 640px) {
+            .stats-panel, .info-panel, .timing-info { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🚦 AI Traffic Management Dashboard</h1>
+    <div class=\"container\">
+        <h1>🚦 AI Dynamic Traffic Signal Optimizer</h1>
         
-        <div class="dashboard">
-            <!-- Video Feed -->
-            <div class="video-panel">
+        <div class=\"sync-banner\">
+            <div class=\"sync-status\">
+                <div class=\"sync-dot\" id=\"sync-dot\"></div>
+                <span id=\"sync-text\">Connecting to Arduino Controller...</span>
+            </div>
+        </div>
+
+        <div class=\"info-panel\">
+            <div class=\"info-card\">
+                <div class=\"info-card-icon\">⏱️</div>
+                <div class=\"info-card-title\">Total Runtime</div>
+                <div class=\"info-card-value\" id=\"runtime\">00:00</div>
+            </div>
+            <div class=\"info-card\">
+                <div class=\"info-card-icon\">🚗</div>
+                <div class=\"info-card-title\">Vehicles Today</div>
+                <div class=\"info-card-value\" id=\"total-vehicles\">0</div>
+            </div>
+            <div class=\"info-card\">
+                <div class=\"info-card-icon\">📊</div>
+                <div class=\"info-card-title\">Avg Density</div>
+                <div class=\"info-card-value\" id=\"avg-density\">LOW</div>
+            </div>
+            <div class=\"info-card\">
+                <div class=\"info-card-icon\">🔄</div>
+                <div class=\"info-card-title\">Signal Cycles</div>
+                <div class=\"info-card-value\" id=\"cycle-count\">0</div>
+            </div>
+            <div class=\"info-card\">
+                <div class=\"info-card-icon\">⚡</div>
+                <div class=\"info-card-title\">Efficiency</div>
+                <div class=\"info-card-value\" id=\"efficiency\">--</div>
+                <div class=\"efficiency-bar\">
+                    <div class=\"efficiency-fill\" id=\"efficiency-fill\" style=\"width: 0%\"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class=\"dashboard\">
+            <div class=\"video-panel\">
+                <div class=\"live-badge\">LIVE</div>
+                <div class=\"no-vehicles-badge\" id=\"no-vehicles-badge\">⚠ NO VEHICLES - Signal RED</div>
                 <h2>Live Traffic Feed</h2>
-                <img id="video-stream" src="{{ url_for('video_feed') }}" alt="Traffic Feed">
+                <img id=\"video-stream\" src=\"{{ url_for('video_feed') }}\" alt=\"Traffic Feed\">
+                <div class=\"phase-progress\">
+                    <div class=\"phase-progress-bar\" id=\"phase-progress\"></div>
+                </div>
+                
+                <div class=\"timing-info\">
+                    <div class=\"timing-item red-time\">
+                        <div class=\"timing-label\">🔴 Red</div>
+                        <div class=\"timing-value\">10s</div>
+                    </div>
+                    <div class=\"timing-item green-time\">
+                        <div class=\"timing-label\">🟢 Green</div>
+                        <div class=\"timing-value\">30s</div>
+                    </div>
+                    <div class=\"timing-item yellow-time\">
+                        <div class=\"timing-label\">🟡 Yellow</div>
+                        <div class=\"timing-value\">3s</div>
+                    </div>
+                </div>
             </div>
             
-            <!-- Statistics Panel -->
-            <div class="stats-panel">
-                <!-- Vehicle Count -->
-                <div class="stat-card">
-                    <h3>Vehicle Count</h3>
-                    <div class="stat-value" id="vehicle-count">0</div>
+            <div class=\"stats-panel\">
+                <div class=\"stat-card\">
+                    <div>
+                        <h3>
+                            <svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.125-.504 1.125-1.125V14.25m-17.25 4.5h14.625c.621 0 1.125-.504 1.125-1.125V14.25m-17.25 4.5v-6.75A.75.75 0 0 1 4.5 9h15a.75.75 0 0 1 .75.75v6.75m0 0H21m-18 0h-1.5m1.5 0v-6.75a.75.75 0 0 1 .75-.75h15a.75.75 0 0 1 .75.75v6.75m0 0v-6.75a.75.75 0 0 1 .75-.75h1.5v6.75m0 0h.75m-21-3h3.375a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-.75.75H3.375a.75.75 0 0 1-.75-.75v-1.5a.75.75 0 0 1 .75-.75Zm15 0h3.375a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-.75.75H18.375a.75.75 0 0 1-.75-.75v-1.5a.75.75 0 0 1 .75-.75Z\" /></svg>
+                            Vehicle Count
+                        </h3>
+                        <div class=\"stat-value\" id=\"vehicle-count\">0</div>
+                    </div>
+                    <svg class=\"sparkline sparkline-count\" width=\"100\" height=\"50\" viewBox=\"0 0 100 50\">
+                        <path d=\"M 0 50 L 100 50\" />
+                    </svg>
                 </div>
                 
-                <!-- Traffic Density -->
-                <div class="stat-card">
-                    <h3>Traffic Density</h3>
-                    <div class="stat-value" id="density">LOW</div>
+                <div class=\"stat-card\">
+                    <div>
+                        <h3>
+                            <svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h12A2.25 2.25 0 0 0 20.25 14.25V3m-16.5 0h16.5m-16.5 0v11.25A2.25 2.25 0 0 0 6 16.5h12A2.25 2.25 0 0 0 20.25 14.25V3\" /></svg>
+                            Traffic Density
+                        </h3>
+                        <div>
+                            <span class=\"status-indicator status-active\"></span>
+                            <span class=\"stat-value\" id=\"density\">LOW</span>
+                        </div>
+                    </div>
+                    <svg class=\"sparkline sparkline-density\" width=\"100\" height=\"50\" viewBox=\"0 0 100 50\">
+                        <defs>
+                            <linearGradient id=\"densityGradient\" x1=\"0%\" y1=\"0%\" x2=\"0%\" y2=\"100%\">
+                                <stop offset=\"0%\" style=\"stop-color:#f59e0b; stop-opacity:0.5\"/>
+                                <stop offset=\"100%\" style=\"stop-color:#f59e0b; stop-opacity:0\"/>
+                            </linearGradient>
+                        </defs>
+                        <path d=\"M 0 50 L 100 50\" />
+                    </svg>
                 </div>
                 
-                <!-- Current Signal -->
-                <div class="stat-card">
-                    <h3>Current Signal</h3>
-                    <div class="stat-value" id="signal-state">RED</div>
-                    <div class="signal-indicator" id="signal-light"></div>
+                <div class=\"stat-card\">
+                    <h3>
+                        <svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 18h.01M8 21h8a2 0 0 0 2-2V5a2 0 0 0-2-2H8a2 0 0-2 2v14a2 0 0 0 2 2zM5 12h.01M19 12h.01M12 5v.01\" /></svg>
+                        Current Signal
+                    </h3>
+                    <div class=\"traffic-light-container\">
+                        <div class=\"traffic-light-housing\">
+                            <div class=\"light\" id=\"light-red\"></div>
+                            <div class=\"light\" id=\"light-yellow\"></div>
+                            <div class=\"light\" id=\"light-green\"></div>
+                        </div>
+                    </div>
                 </div>
                 
-                <!-- Green Time -->
-                <div class="stat-card">
-                    <h3>Green Light Duration</h3>
-                    <div class="stat-value" id="green-time">10<span style="font-size: 0.5em;"> sec</span></div>
+                <div class=\"stat-card\">
+                    <h3>
+                        <svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z\" /></svg>
+                        Phase Timer
+                    </h3>
+                    <div class=\"timer-gauge-container\">
+                        <svg class=\"timer-gauge-svg\" viewBox=\"0 0 36 36\">
+                            <circle class=\"gauge-bg\" cx=\"18\" cy=\"18\" r=\"15.9155\" />
+                            <circle class=\"gauge-progress\" id=\"timer-gauge-progress\"
+                                cx=\"18\" cy=\"18\" r=\"15.9155\"
+                                stroke-dasharray=\"100 100\"
+                                stroke-dashoffset=\"100\" />
+                        </svg>
+                        <div class=\"timer-text\" id=\"timer-text\">--<span>sec</span></div>
+                    </div>
                 </div>
             </div>
         </div>
         
-        <div class="footer">
-            <p>AI-Powered Traffic Signal Controller | Powered by YOLOv8</p>
+        <div class=\"footer\">
+            <p>🚦 AI Traffic Controller | Status: <span class=\"status-indicator status-active\"></span> Active</p>
+            <button onclick=\"resetStats()\">Reset Statistics</button>
         </div>
     </div>
     
     <script>
-        // Update dashboard data every second
+        const elements = {
+            vehicleCount: document.getElementById('vehicle-count'),
+            density: document.getElementById('density'),
+            lightRed: document.getElementById('light-red'),
+            lightYellow: document.getElementById('light-yellow'),
+            lightGreen: document.getElementById('light-green'),
+            countSparkline: document.querySelector('.sparkline-count path'),
+            densitySparkline: document.querySelector('.sparkline-density path'),
+            timerGauge: document.getElementById('timer-gauge-progress'),
+            timerText: document.getElementById('timer-text'),
+            phaseProgress: document.getElementById('phase-progress'),
+            runtime: document.getElementById('runtime'),
+            totalVehicles: document.getElementById('total-vehicles'),
+            avgDensity: document.getElementById('avg-density'),
+            cycleCount: document.getElementById('cycle-count'),
+            syncDot: document.getElementById('sync-dot'),
+            syncText: document.getElementById('sync-text'),
+            noVehiclesBadge: document.getElementById('no-vehicles-badge'),
+            efficiency: document.getElementById('efficiency'),
+            efficiencyFill: document.getElementById('efficiency-fill'),
+            statusIndicator: document.querySelector('.status-indicator')
+        };
+
+        const gaugeRadius = elements.timerGauge.r.baseVal.value;
+        const gaugeCircumference = 2 * Math.PI * gaugeRadius;
+        elements.timerGauge.style.strokeDasharray = `${gaugeCircumference} ${gaugeCircumference}`;
+        elements.timerGauge.style.strokeDashoffset = gaugeCircumference;
+
+        let countHistory = new Array(20).fill(0);
+        let densityHistory = new Array(20).fill(1);
+        let densitySum = 0, densityReadings = 0;
+        let isSynced = false;
+        let totalGreenTime = 0, totalRedTime = 0;
+
+        const SIGNAL_DURATIONS = { 'RED': 10, 'GREEN': 30, 'YELLOW': 3 };
+
+        function updateTrafficLight(state) {
+            elements.lightRed.className = 'light';
+            elements.lightYellow.className = 'light';
+            elements.lightGreen.className = 'light';
+            if (state === 'RED') elements.lightRed.classList.add('active', 'red');
+            else if (state === 'YELLOW') elements.lightYellow.classList.add('active', 'yellow');
+            else if (state === 'GREEN') elements.lightGreen.classList.add('active', 'green');
+        }
+
+        function updateGauge(current, state) {
+            const max = SIGNAL_DURATIONS[state] || 10;
+            const percent = current / max;
+            elements.timerGauge.style.strokeDashoffset = gaugeCircumference * (1 - percent);
+            
+            if (state === 'GREEN') {
+                elements.timerGauge.style.stroke = 'var(--light-green)';
+                totalGreenTime++;
+            } else if (state === 'YELLOW') {
+                elements.timerGauge.style.stroke = 'var(--light-yellow)';
+            } else {
+                elements.timerGauge.style.stroke = 'var(--light-red)';
+                totalRedTime++;
+            }
+
+            elements.timerText.innerHTML = `${current}<span>sec</span>`;
+            elements.phaseProgress.style.width = `${((max - current) / max) * 100}%`;
+            
+            if (totalGreenTime + totalRedTime > 0) {
+                const eff = (totalGreenTime / (totalGreenTime + totalRedTime)) * 100;
+                elements.efficiency.textContent = Math.round(eff) + '%';
+                elements.efficiencyFill.style.width = eff + '%';
+            }
+        }
+
+        function updateSparkline(pathEl, data, maxVal, chartType = 'area') {
+            const width = 100, height = 50, step = width / (data.length - 1);
+            let pathData = `M 0 ${height - (data[0] / maxVal) * height}`;
+            for (let i = 1; i < data.length; i++) {
+                pathData += ` L ${i * step} ${height - (data[i] / maxVal) * height}`;
+            }
+            if (chartType === 'area') pathData += ` L ${width} ${height} L 0 ${height} Z`;
+            pathEl.setAttribute('d', pathData);
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        function updateSyncStatus(synced) {
+            if (synced !== isSynced) {
+                isSynced = synced;
+                if (synced) {
+                    elements.syncDot.classList.add('active');
+                    elements.syncText.textContent = '✓ Synced with Arduino Controller';
+                } else {
+                    elements.syncDot.classList.remove('active');
+                    elements.syncText.textContent = '⚠ Standalone Mode - Start main.py for Arduino sync';
+                }
+            }
+        }
+
+        function resetStats() {
+            fetch('/api/reset')
+                .then(response => response.json())
+                .then(() => elements.totalVehicles.textContent = '0')
+                .catch(error => console.error('Reset error:', error));
+        }
+
         function updateDashboard() {
             fetch('/api/status')
                 .then(response => response.json())
                 .then(data => {
-                    // Update vehicle count
-                    document.getElementById('vehicle-count').textContent = data.vehicle_count;
+                    updateSyncStatus(data.synced_with_main || false);
                     
-                    // Update density with color
-                    const densityElement = document.getElementById('density');
-                    densityElement.textContent = data.density;
-                    densityElement.className = 'stat-value density-' + data.density;
+                    const count = data.vehicle_count || 0;
+                    elements.vehicleCount.textContent = count;
                     
-                    // Update signal state
-                    const signalElement = document.getElementById('signal-state');
-                    signalElement.textContent = data.signal_state;
+                    const density = data.density || 'LOW';
+                    elements.density.textContent = density;
+                    elements.density.className = 'stat-value density-' + density;
                     
-                    // Update signal light indicator
-                    const lightElement = document.getElementById('signal-light');
-                    lightElement.className = 'signal-indicator signal-' + data.signal_state;
+                    if (density === 'HIGH') elements.statusIndicator.className = 'status-indicator status-stopped';
+                    else if (density === 'MEDIUM') elements.statusIndicator.className = 'status-indicator status-waiting';
+                    else elements.statusIndicator.className = 'status-indicator status-active';
                     
-                    // Update green time
-                    document.getElementById('green-time').innerHTML = 
-                        data.green_time + '<span style="font-size: 0.5em;"> sec</span>';
+                    let densityValue = density === 'HIGH' ? 3 : (density === 'MEDIUM' ? 2 : 1);
+                    densitySum += densityValue;
+                    densityReadings++;
+                    
+                    countHistory.shift();
+                    countHistory.push(count);
+                    densityHistory.shift();
+                    densityHistory.push(densityValue);
+                    
+                    updateSparkline(elements.countSparkline, countHistory, 50, 'line');
+                    updateSparkline(elements.densitySparkline, densityHistory, 3, 'area');
+                    
+                    const signalState = data.signal_state || 'RED';
+                    updateTrafficLight(signalState);
+                    
+                    const timeRemaining = data.time_remaining || 0;
+                    updateGauge(timeRemaining, signalState);
+                    
+                    // Show/hide no vehicles badge
+                    if (count === 0 && signalState === 'RED') {
+                        elements.noVehiclesBadge.classList.add('active');
+                    } else {
+                        elements.noVehiclesBadge.classList.remove('active');
+                    }
+                    
+                    elements.runtime.textContent = formatTime(data.total_runtime || 0);
+                    elements.cycleCount.textContent = data.cycle_count || 0;
+                    elements.totalVehicles.textContent = data.total_vehicles_today || 0;
+                    
+                    if (densityReadings > 0) {
+                        const avgValue = densitySum / densityReadings;
+                        if (avgValue > 2.5) elements.avgDensity.textContent = 'HIGH';
+                        else if (avgValue > 1.5) elements.avgDensity.textContent = 'MEDIUM';
+                        else elements.avgDensity.textContent = 'LOW';
+                    }
                 })
                 .catch(error => console.error('Error fetching status:', error));
         }
         
-        // Update every second
-        setInterval(updateDashboard, 1000);
-        
-        // Initial update
+        updateTrafficLight('RED');
+        updateGauge(10, 'RED');
         updateDashboard();
+        setInterval(updateDashboard, 1000);
     </script>
 </body>
 </html>

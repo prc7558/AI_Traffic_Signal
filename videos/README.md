@@ -48,6 +48,15 @@ Search these terms on YouTube:
 - "city traffic video"
 - "dashcam traffic"
 
+## Testing Without Video:
+
+If you don't have a video yet, you can still test:
+1. Test installation: `python src/test_installation.py`
+2. Test modules: `python src/test_system.py`
+3. Test Arduino: `python src/arduino_controller.py`
+
+Once you have video, the full system will work!
+
 ---
 
 **Note**: Make sure video filename is exactly `traffic_video.mp4` or update the path in the code.

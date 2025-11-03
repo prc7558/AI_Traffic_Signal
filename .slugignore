@@ -1,0 +1,22 @@
+# Exclude from deployment
+*.md
+docs/
+arduino/
+videos/*.mp4
+src/main.py
+src/test_*.py
+test_sync.py
+*.bat
+*.sh
+.git
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/

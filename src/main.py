@@ -1,6 +1,7 @@
 """
 Main Integration Script
 Combines vehicle detection, density analysis, and signal control
+Synchronized with web dashboard via shared state
 """
 
 import cv2
@@ -9,9 +10,10 @@ from vehicle_detector import VehicleDetector
 from traffic_density_analyzer import TrafficDensityAnalyzer
 from traffic_signal_controller import TrafficSignalController
 from arduino_controller import ArduinoController
+from shared_state import get_state_manager
 
 class TrafficManagementSystem:
-    def __init__(self, video_path, arduino_port='COM3'):
+    def __init__(self, video_path, arduino_port='COM3', sync_with_dashboard=True):
         """
         Initialize the complete traffic management system
         """
@@ -23,6 +25,12 @@ class TrafficManagementSystem:
         self.signal_controller = TrafficSignalController()
         self.arduino = ArduinoController(port=arduino_port)
         
+        # Initialize shared state manager for dashboard sync
+        self.sync_with_dashboard = sync_with_dashboard
+        if sync_with_dashboard:
+            self.state_manager = get_state_manager()
+            print("✓ Dashboard synchronization enabled")
+        
         # Video capture
         self.cap = cv2.VideoCapture(video_path)
         if not self.cap.isOpened():
@@ -32,6 +40,8 @@ class TrafficManagementSystem:
         self.current_density = "LOW"
         self.vehicle_count = 0
         self.signal_state = "RED"
+        self.cycle_count = 0
+        self.start_time = time.time()
         
         print("✓ System initialized successfully!\n")
     
@@ -64,11 +74,18 @@ class TrafficManagementSystem:
         cv2.putText(annotated_frame, f"Green Time: {green_time}s", 
                    (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         
+        # Add sync indicator
+        if self.sync_with_dashboard:
+            cv2.putText(annotated_frame, "SYNCED", 
+                       (annotated_frame.shape[1] - 120, 30), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        
         return annotated_frame
     
-    def update_signal(self, state):
+    def update_signal(self, state, time_remaining=0):
         """
         Update traffic signal state and send to Arduino
+        Also updates shared state for dashboard
         """
         self.signal_state = state
         
@@ -81,28 +98,64 @@ class TrafficManagementSystem:
         
         if state in signal_map:
             self.arduino.send_signal(signal_map[state])
+        
+        # Update shared state for dashboard sync
+        if self.sync_with_dashboard:
+            total_runtime = int(time.time() - self.start_time)
+            self.state_manager.update_state(
+                signal_state=state,
+                vehicle_count=self.vehicle_count,
+                density=self.current_density,
+                green_time=self.analyzer.calculate_green_time(self.current_density),
+                time_remaining=time_remaining,
+                cycle_count=self.cycle_count,
+                total_runtime=total_runtime
+            )
     
     def run_signal_cycle(self):
         """
         Run one complete signal cycle based on current density
+        NEW: Stays RED if no vehicles detected
         """
-        timing = self.signal_controller.get_signal_timing(self.current_density)
+        # Check if there are vehicles
+        has_vehicles = self.vehicle_count > 0
         
-        # RED signal
-        self.update_signal("RED")
-        self.run_for_duration(timing["RED"])
+        timing = self.signal_controller.get_signal_timing(
+            self.current_density, 
+            has_vehicles=has_vehicles
+        )
         
-        # GREEN signal
-        self.update_signal("GREEN")
-        self.run_for_duration(timing["GREEN"])
+        # If no vehicles, stay RED and wait
+        if not has_vehicles:
+            self.update_signal("RED", 10)
+            if not self.run_for_duration(10):  # Check every 10 seconds
+                return False
+            return True  # Don't increment cycle, just loop
         
-        # YELLOW signal
-        self.update_signal("YELLOW")
-        self.run_for_duration(timing["YELLOW"])
+        # RED signal (10 seconds)
+        self.update_signal("RED", timing["RED"])
+        if not self.run_for_duration(timing["RED"]):
+            return False
+        
+        # GREEN signal (30 seconds)
+        self.update_signal("GREEN", timing["GREEN"])
+        if not self.run_for_duration(timing["GREEN"]):
+            return False
+        
+        # YELLOW signal (3 seconds)
+        self.update_signal("YELLOW", timing["YELLOW"])
+        if not self.run_for_duration(timing["YELLOW"]):
+            return False
+        
+        # Increment cycle count
+        self.cycle_count += 1
+        
+        return True
     
     def run_for_duration(self, duration):
         """
         Process frames for a specific duration (in seconds)
+        Updates time remaining in shared state
         """
         start_time = time.time()
         while (time.time() - start_time) < duration:
@@ -110,9 +163,23 @@ class TrafficManagementSystem:
             if frame is None:
                 break
             
-            # Add timer to frame
+            # Calculate remaining time
             elapsed = int(time.time() - start_time)
             remaining = duration - elapsed
+            
+            # Update shared state with current time remaining
+            if self.sync_with_dashboard:
+                total_runtime = int(time.time() - self.start_time)
+                self.state_manager.update_state(
+                    signal_state=self.signal_state,
+                    vehicle_count=self.vehicle_count,
+                    density=self.current_density,
+                    time_remaining=remaining,
+                    cycle_count=self.cycle_count,
+                    total_runtime=total_runtime
+                )
+            
+            # Add timer to frame
             cv2.putText(frame, f"Time: {remaining}s", 
                        (10, 190), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
             
@@ -128,7 +195,11 @@ class TrafficManagementSystem:
         Main system loop
         """
         print("Starting Traffic Management System...")
-        print("Press 'q' to quit\n")
+        print("Press 'q' to quit")
+        if self.sync_with_dashboard:
+            print("Dashboard sync: ENABLED - Check http://localhost:5000\n")
+        else:
+            print()
         
         try:
             while self.cap.isOpened():
@@ -160,10 +231,15 @@ class TrafficManagementSystem:
 if __name__ == "__main__":
     # Configuration
     VIDEO_PATH = "../videos/traffic_video.mp4"
-    ARDUINO_PORT = "COM7"  # Change to your Arduino port
+    ARDUINO_PORT = "COM3"  # Change to your Arduino port
+    SYNC_WITH_DASHBOARD = True  # Enable dashboard synchronization
     
     try:
-        system = TrafficManagementSystem(VIDEO_PATH, ARDUINO_PORT)
+        system = TrafficManagementSystem(
+            VIDEO_PATH, 
+            ARDUINO_PORT,
+            sync_with_dashboard=SYNC_WITH_DASHBOARD
+        )
         system.run()
     except Exception as e:
         print(f"Error: {e}")
@@ -171,3 +247,4 @@ if __name__ == "__main__":
         print("  1. Video file exists in 'videos' folder")
         print("  2. Arduino is connected to correct port")
         print("  3. All dependencies are installed")
+        print("  4. Dashboard is running (if sync enabled)")

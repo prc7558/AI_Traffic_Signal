@@ -12,27 +12,30 @@ class TrafficSignalController:
         self.current_state = "RED"
         self.current_index = 0
         
-        # Fixed timings
-        self.yellow_time = 3  # Yellow always 3 seconds
-        self.red_time = 2     # Minimum red time
+        # Fixed timings (NEW: 10-30-3 cycle)
+        self.yellow_time = 3   # Yellow always 3 seconds
+        self.red_time = 10     # Red is now 10 seconds
+        self.green_time = 30   # Green is now 30 seconds (constant)
         
-    def get_signal_timing(self, density):
+    def get_signal_timing(self, density, has_vehicles=True):
         """
-        Calculate timing for each signal phase based on density
+        Calculate timing for each signal phase
+        NEW: Fixed 10-30-3 cycle, stays RED if no vehicles
         Returns: dictionary with timing for each state
         """
-        # Green time varies with density
-        if density == "LOW":
-            green_time = 10
-        elif density == "MEDIUM":
-            green_time = 20
-        else:  # HIGH
-            green_time = 30
+        # If no vehicles detected, stay RED indefinitely
+        if not has_vehicles:
+            return {
+                "RED": 999999,  # Stay red indefinitely
+                "GREEN": 0,
+                "YELLOW": 0
+            }
         
+        # Fixed timing: 10 RED -> 30 GREEN -> 3 YELLOW
         return {
-            "GREEN": green_time,
-            "YELLOW": self.yellow_time,
-            "RED": self.red_time
+            "RED": self.red_time,      # 10 seconds
+            "GREEN": self.green_time,  # 30 seconds
+            "YELLOW": self.yellow_time # 3 seconds
         }
     
     def get_next_state(self):

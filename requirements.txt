@@ -2,7 +2,7 @@
 
 # Computer Vision and AI
 ultralytics>=8.0.0
-opencv-python>=4.8.0
+opencv-python-headless>=4.8.0
 numpy>=1.24.0
 
 # Arduino Communication
@@ -10,6 +10,7 @@ pyserial>=3.5
 
 # Web Dashboard
 flask>=2.3.0
+gunicorn>=21.2.0
 
 # Data Processing
 pandas>=2.0.0

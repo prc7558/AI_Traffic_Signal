@@ -1,7 +1,6 @@
 """
-Flask Dashboard for Traffic Management System
+Flask Dashboard for Traffic Management System - Production Version
 Shows real-time vehicle count, density, and signal status
-Synchronized with main.py via shared state
 """
 
 from flask import Flask, render_template, Response, jsonify
@@ -26,9 +25,9 @@ system_state = {
     'vehicle_count': 0,
     'density': 'LOW',
     'signal_state': 'RED',
-    'green_time': 10,
+    'green_time': 30,
     'last_update': time.time(),
-    'time_remaining': 2,
+    'time_remaining': 10,
     'cycle_count': 0,
     'total_runtime': 0,
     'synced_with_main': False
@@ -50,11 +49,23 @@ VEHICLE_UPDATE_RATE = 3.0  # Update every 3 seconds (much slower)
 def init_video(video_path):
     """Initialize video capture"""
     global video_capture
-    video_capture = cv2.VideoCapture(video_path)
-    if not video_capture.isOpened():
-        print(f"Error: Could not open video {video_path}")
-        return False
-    return True
+    
+    # Try to open video file
+    if os.path.exists(video_path):
+        video_capture = cv2.VideoCapture(video_path)
+        if video_capture.isOpened():
+            print(f"✓ Video loaded: {video_path}")
+            return True
+    
+    # Try webcam as fallback
+    print("Video file not found, trying webcam...")
+    video_capture = cv2.VideoCapture(0)
+    if video_capture.isOpened():
+        print("✓ Using webcam")
+        return True
+    
+    print("✗ Could not open video source")
+    return False
 
 def sync_with_main():
     """Background thread to sync state with main.py"""
@@ -74,7 +85,7 @@ def sync_with_main():
                     system_state['signal_state'] = shared.get('signal_state', 'RED')
                     system_state['vehicle_count'] = shared.get('vehicle_count', 0)
                     system_state['density'] = shared.get('density', 'LOW')
-                    system_state['green_time'] = shared.get('green_time', 10)
+                    system_state['green_time'] = shared.get('green_time', 30)
                     system_state['time_remaining'] = shared.get('time_remaining', 0)
                     system_state['cycle_count'] = shared.get('cycle_count', 0)
                     system_state['total_runtime'] = shared.get('total_runtime', 0)
@@ -104,7 +115,17 @@ def generate_frames():
     
     while True:
         if video_capture is None or not video_capture.isOpened():
-            break
+            # Return placeholder frame
+            import numpy as np
+            placeholder = np.zeros((480, 640, 3), dtype=np.uint8)
+            cv2.putText(placeholder, "No Video Source", (150, 240), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 2)
+            ret, buffer = cv2.imencode('.jpg', placeholder)
+            frame = buffer.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            time.sleep(0.1)
+            continue
             
         ret, frame = video_capture.read()
         if not ret:
@@ -115,10 +136,14 @@ def generate_frames():
         # Only detect vehicles if NOT synced with main.py
         with state_lock:
             if not system_state['synced_with_main']:
-                count, annotated_frame = detector.detect_vehicles(frame)
-                system_state['vehicle_count'] = count
-                system_state['density'] = analyzer.classify_density(count)
-                system_state['green_time'] = analyzer.calculate_green_time(system_state['density'])
+                try:
+                    count, annotated_frame = detector.detect_vehicles(frame)
+                    system_state['vehicle_count'] = count
+                    system_state['density'] = analyzer.classify_density(count)
+                    system_state['green_time'] = 30  # Fixed green time
+                except Exception as e:
+                    print(f"Detection error: {e}")
+                    annotated_frame = frame.copy()
             else:
                 # Just annotate the frame, detection done by main.py
                 annotated_frame = frame.copy()
@@ -170,23 +195,35 @@ def reset_stats():
         vehicle_accumulator = 0
     return jsonify({'status': 'reset', 'message': 'Statistics reset successfully'})
 
+@app.route('/health')
+def health():
+    """Health check endpoint"""
+    return jsonify({'status': 'healthy', 'timestamp': time.time()})
+
 if __name__ == '__main__':
     # Initialize with default video
-    video_path = '../videos/traffic_video.mp4'
+    video_path = os.path.join(os.path.dirname(__file__), '..', 'videos', 'traffic_video.mp4')
     
-    if init_video(video_path):
-        # Start sync thread
-        sync_thread = Thread(target=sync_with_main, daemon=True)
-        sync_thread.start()
-        
-        print("=" * 60)
-        print("🚦 Traffic Management Dashboard Starting...")
-        print("=" * 60)
-        print(f"📺 Dashboard URL: http://localhost:5000")
-        print(f"🔄 Sync Status: Waiting for main.py...")
-        print(f"💡 Tip: Run main.py to enable Arduino synchronization")
-        print("=" * 60)
-        
-        app.run(debug=True, threaded=True, use_reloader=False)
-    else:
-        print("Please place a video file at:", video_path)
+    # Try to initialize video
+    video_initialized = init_video(video_path)
+    
+    if not video_initialized:
+        print("⚠ Running without video - dashboard will show placeholder")
+    
+    # Start sync thread
+    sync_thread = Thread(target=sync_with_main, daemon=True)
+    sync_thread.start()
+    
+    print("=" * 60)
+    print("🚦 Traffic Management Dashboard Starting...")
+    print("=" * 60)
+    print(f"📺 Dashboard URL: http://localhost:5000")
+    print(f"🔄 Sync Status: Waiting for main.py...")
+    print(f"💡 Tip: Run main.py to enable Arduino synchronization")
+    print("=" * 60)
+    
+    # Get port from environment variable (for deployment) or use 5000
+    port = int(os.environ.get('PORT', 5000))
+    
+    # Run the app
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
